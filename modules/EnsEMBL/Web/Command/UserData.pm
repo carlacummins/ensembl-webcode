@@ -1,6 +1,7 @@
 =head1 LICENSE
 
-Copyright [1999-2016] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,6 +27,7 @@ use Digest::MD5 qw(md5_hex);
 use EnsEMBL::Web::File::User;
 use EnsEMBL::Web::IOWrapper;
 use EnsEMBL::Web::ImageConfig;
+use EnsEMBL::Web::Utils::Sanitize qw(clean_id);
 
 use base qw(EnsEMBL::Web::Command);
 
@@ -37,12 +39,12 @@ sub ajax_redirect {
 
 sub upload {
 ### Simple wrapper around File::User 
-  my ($self, $method, $format, $renderer) = @_;
+  my ($self, $method, $format, $renderer, $size_limit) = @_;
   my $hub       = $self->hub;
   my $params    = {};
 
   my $file  = EnsEMBL::Web::File::User->new('hub' => $hub, 'empty' => 1);
-  my $error = $file->upload('method' => $method, 'format' => $format, 'renderer' => $renderer);
+  my $error = $file->upload('method' => $method, 'format' => $format, 'renderer' => $renderer, 'size_limit' => $size_limit || 0);
 
   ## Validate format
   my $iow;
@@ -92,58 +94,14 @@ sub upload {
     $params->{'species'}  = $hub->param('species') || $hub->species;
     $params->{'format'}   = $iow->format;
     $params->{'code'}     = $file->code;
-
+    # Store last uploaded userdata to highlight on pageload
+    $hub->session->add_data(
+      type => 'userdata_upload_code',
+      upload_code => $file->code
+    );
   } 
  
   return $params;
-}
-
-sub check_attachment {
-  my ($self, $url) = @_;
-  my $hub = $self->hub;
-  my $species_defs = $hub->species_defs;
-
-  my $already_attached = 0;
-  my ($redirect, $params, $menu);
-
-  ## Check for pre-configured hubs
-  my %preconfigured = %{$species_defs->ENSEMBL_INTERNAL_TRACKHUB_SOURCES||{}};
-  while (my($k, $v) = each (%preconfigured)) {
-    my $hub_info = $species_defs->get_config($hub->species, $k);
-    if ($hub_info->{'url'} eq $url) {
-      $already_attached = 'preconfig';
-      ## Probably a submenu, so get full id
-      my $menu_tree = EnsEMBL::Web::ImageConfig::menus({});
-      my $menu_settings = $menu_tree->{$v};
-      if (ref($menu_settings) eq 'ARRAY') {
-        $menu = $menu_settings->[1].'-'.$v;
-      }
-      else {
-        $menu = $v;
-      }
-      last;
-    }
-  }
-
-  ## Check user's own data
-  unless ($already_attached) {
-    my @attachments = $hub->session->get_data('type' => 'url');
-    foreach (@attachments) {
-      if ($_->{'url'} eq $url) {
-        $already_attached = 'user';
-        ($menu = $_->{'name'}) =~ s/ /_/;
-        last;
-      }
-    }
-  }
-
-  if ($already_attached) {
-    $redirect = 'RemoteFeedback';
-    $params = {'format' => 'TRACKHUB', 'reattach' => $already_attached};
-    $params->{'menu'} = $menu if $menu;
-  }
-
-  return ($redirect, $params);
 }
 
 sub attach {
@@ -183,7 +141,11 @@ sub attach {
 
     foreach (@$assemblies) {
 
-      my ($current_species, $assembly, $is_old) = @{$ensembl_assemblies->{$_}||[]};
+      ## Try with and without species name, as it depends on format
+      my ($current_species, $assembly, $is_old) = @{$ensembl_assemblies->{$_}
+                                                    || $ensembl_assemblies->{$hub->species.'_'.$_} || []};
+      
+
 
       ## This is a bit messy, but there are so many permutations!
       if ($assembly) {
@@ -206,11 +168,12 @@ sub attach {
           }
         }
 
+        my $t_code = join('_', md5_hex($name . $current_species . $assembly . $url), 
+                                  $hub->session->create_session_id); 
         unless ($is_old) {
           my $data = $hub->session->add_data(
                                         type        => 'url',
-                                        code        => join('_', md5_hex($name . $current_species . $assembly . $url), 
-                                                                  $hub->session->create_session_id),
+                                        code        => $t_code,
                                         url         => $url,
                                         name        => $name,
                                         format      => $attachable->name,
@@ -224,7 +187,11 @@ sub attach {
           $hub->session->configure_user_data('url', $data);
 
           $code = $data->{'code'};
-    
+          # Store last uploaded userdata to highlight on pageload
+          $hub->session->add_data(
+            type => 'userdata_upload_code',
+            upload_code => $code
+          );    
           $self->object->move_to_user(type => 'url', code => $data->{'code'}) if $hub->param('save');
         }
       }

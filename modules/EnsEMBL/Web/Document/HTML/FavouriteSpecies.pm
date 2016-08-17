@@ -1,6 +1,7 @@
 =head1 LICENSE
 
-Copyright [1999-2016] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -83,7 +84,12 @@ sub render_ajax_reorder_list {
   my @fav_list      = map qq\<li id="favourite-$_->{'key'}">$_->{'common'} (<em>$_->{'scientific'}</em>)</li>\, map $species_info{$_}, @$favourites;
   
   delete $species_info{$_} for @$favourites;
-  
+ 
+  ## remove strains
+  while (my ($k, $v) = each (%species_info)) {
+    delete $species_info{$k} if $v->{'strain'};
+  }
+ 
   my @sorted       = sort { $a->{'common'} cmp $b->{'common'} } values %species_info;
   my @species_list = map qq\<li id="species-$_->{'key'}">$_->{'common'} (<em>$_->{'scientific'}</em>)</li>\, @sorted;
   

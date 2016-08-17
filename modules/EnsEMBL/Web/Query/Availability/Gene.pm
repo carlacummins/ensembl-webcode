@@ -1,3 +1,22 @@
+=head1 LICENSE
+
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+=cut
+
 package EnsEMBL::Web::Query::Availability::Gene;
 
 use strict;
@@ -10,16 +29,9 @@ our $VERSION = 1;
 sub precache {
   return {
     'av-gene' => {
-      loop => 'genes',
+      loop => ['species','genes'],
       args => {
         species => "Homo_sapiens",
-        type => "core",
-      }
-    },
-    'av-gene-hh' => {
-      loop => 'genes',
-      args => {
-        species => "Erinaceus_europaeus",
         type => "core",
       }
     },
@@ -217,8 +229,8 @@ sub get {
   my $ad = $self->source('Adaptors');
   my $out = $self->super_availability($args);
 
-  my $member = $self->compara_member($args);
-  my $panmember = $self->pancompara_member($args);
+  my $member = $self->compara_member($args) if $out->{'database:compara'};
+  my $panmember = $self->pancompara_member($args) if $out->{'database:pancompara'};
   my $counts = $self->_counts($args,$member,$panmember);
   my %clusters = $self->multiX('ONTOLOGIES');
 
@@ -268,7 +280,7 @@ sub get {
   if($self->variation_db_adaptor($args)) {
     $out->{'has_phenotypes'} = $self->_get_phenotype($args);
   }
-  if($self->pancompara_db_adaptor) {
+  if($out->{'database:pancompara'} && $self->pancompara_db_adaptor) {
     $out->{'family_pan_ensembl'} = !!$counts->{'families_pan'};
     $out->{'has_gene_tree_pan'} =
       $panmember ? $panmember->has_GeneTree : 0;

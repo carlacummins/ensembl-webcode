@@ -1,6 +1,7 @@
 =head1 LICENSE
 
-Copyright [1999-2016] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -248,7 +249,7 @@ sub get_content {
       $content = $self->$function;
     } else {
       $content = $self->content; # Force sequence-point before buttons call.
-      $content = $self->content_buttons.$content;
+      $content = $self->header.$self->content_buttons.$content;
     }
     if ($cache && $content && $self->mcacheable) { # content method call can change mcacheable value
       $self->set_cache_key;
@@ -475,9 +476,18 @@ sub hint_panel {
   return $self->_info_panel('hint hint_flag', $caption, $desc, $width, $id);
 }
 
+sub sidebar_panel {
+  ## Similar to an info panel, but smaller and floats right rather than filling the page
+  ## @params Heading, description text, width of the box (defaults to 50%)
+  my ($self, $caption, $desc, $width) = @_;
+  $width ||= '50%';
+  return $self->_info_panel('sidebar', $caption, $desc, $width);
+}
+
 sub site_name   { return $SiteDefs::SITE_NAME || $SiteDefs::ENSEMBL_SITETYPE; }
 sub image_width { return shift->hub->param('image_width') || $ENV{'ENSEMBL_IMAGE_WIDTH'}; }
 sub caption     { return undef; }
+sub header      { return undef; }
 sub _init       { return; }
 
 ## TODO - remove these four method once above four methods are used instead of these

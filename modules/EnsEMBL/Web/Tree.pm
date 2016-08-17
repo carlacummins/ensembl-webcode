@@ -1,6 +1,7 @@
 =head1 LICENSE
 
-Copyright [1999-2016] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +18,8 @@ limitations under the License.
 =cut
 
 package EnsEMBL::Web::Tree;
+
+use EnsEMBL::Web::Utils::Sanitize qw(clean_id);
 
 use base qw(EnsEMBL::Web::DOM::Node::Element::Generic);
 
@@ -55,7 +58,7 @@ sub _flush_tree { $_[0]->{'user_data'} = {};           } # TODO: rename to flush
 
 sub get_node {
   my ($self, $id) = @_;
-  return $self->tree_ids->{$self->clean_id($id)};
+  return $self->tree_ids->{clean_id($id)};
 }
 
 sub flush_user {
@@ -105,17 +108,11 @@ sub generate_unique_id {
   return $self->{'id'};
 }
 
-sub clean_id {
-  my $match = $_[2] || '[^\w-]';
-  $_[1] =~ s/$match/_/g;
-  return $_[1];
-}
-
 sub create_node {
   ### Node is always created as a "root" node - needs to be appended to another node to make it part of another tree.
   
   my ($self, $id, $data) = @_;
-  $id = $id ? $self->clean_id($id) : $self->generate_unique_id;
+  $id = $id ? clean_id($id) : $self->generate_unique_id;
   
   if (exists $self->tree_ids->{$id}) {
     my $node = $self->get_node($id);

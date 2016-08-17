@@ -1,6 +1,7 @@
 =head1 LICENSE
 
-Copyright [1999-2014] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -322,10 +323,11 @@ sub hover_labels {
 
     $html .= sprintf(qq(
       <div class="hover_label floating_popup %s">
-        <p class="header _hl_pin"><span class="hl-pin"></span>%s<span class="_hl_extend hl-extend"></span></p>
+        <p class="header _hl_pin"><span class="hl-pin"></span><span class="_track_menu_header">%s</span><span class="_hl_extend hl-extend"></span></p>
         <div class="hl-buttons">%s</div>
         <div class="hl-content">%s</div>
         <div class="spinner"></div>
+        <span class="close"></span>
       </div>),
       $label->{'class'},
       $label->{'header'},
@@ -346,6 +348,7 @@ sub hover_label_tabs {
      $desc   .= $label->{'extra_desc'};
   my $subset  = $label->{'subset'};
   my $renderers;
+  my $highlight = ($self->hub->type =~m/Location|Gene/ && $self->hub->action =~/Multi|Variation_Gene/) ? 0 : 1;
 
   foreach (@{$label->{'renderers'}}) {
 
@@ -390,6 +393,11 @@ sub hover_label_tabs {
     push @contents, qq(<div class="_hl_tab hl-tab"><p>Click on the cross to turn the track off</p></div>);
   }
 
+  if ($highlight) {
+    push @buttons, qq(<div class="_hl_icon hl-icon"><a class="hl-icon-highlight" data-highlight-track="$label->{'highlight'}"></a></div>);
+    push @contents, qq(<div class="_hl_tab hl-tab"><p>Click to highlight/unhighlight this track</p></div>);
+  }
+
   return (\@buttons, \@contents);
 }
 
@@ -403,15 +411,12 @@ sub track_boundaries {
   my %track_ids       = map  { $_->id => 1 } @sortable_tracks;
   my %strand_map      = ( f => 1, r => -1 );
   my @boundaries;
- 
   my $prev_section; 
   foreach my $glyphset (@{$container->{'glyphsets'}}) {
     next unless scalar @{$glyphset->{'glyphs'}};
-
     my $height = $glyphset->height + $spacing;
     my $type   = $glyphset->type;
     my $node;  
-    
     my $collapse = 0;
       
     if ($track_ids{$type}) {
@@ -446,14 +451,32 @@ sub moveable_tracks {
   my $url     = $image->read_url;
   my ($top, $html);
   
+  # Get latest uploaded user data to add highlight class
+  my $last_uploaded_user_data_code = {};
+
+  if ($self->hub->session->get_data(type => 'userdata_upload_code')) {
+    foreach my $hash ($self->hub->session->get_data(type => 'userdata_upload_code')) {
+      $last_uploaded_user_data_code->{$hash->{upload_code}} = 1;
+    }
+  }
+
+  # Purge this data so that it doesn't highlight second time.
+  $self->hub->session->purge_data(type => 'userdata_upload_code');
+  
   foreach (@{$self->track_boundaries}) {
     my ($t, $h, $type, $strand) = @$_;
 
+    # For highlight, upload_ and url_ prefixes are not there in the session data.
+    # So split remove and then compare
+    my ($record_type, $code) = split(/_/,$type, 2);
+    my $highlight = $last_uploaded_user_data_code->{$code} || 0;
+
     $html .= sprintf(
-      '<li class="%s%s" style="height:%spx;background:url(%s) 0 %spx%s">
+      '<li class="%s %s %s" style="height:%spx;background:url(%s) 0 %spx%s">
         <div class="handle" style="height:%spx"%s><p></p></div>
       </li>',
-      $type, $strand ? " $strand" : '',
+      $type, $strand ? "$strand" : '',
+      $highlight ? '_new_userdata usertrack_highlight' : '',
       $h, $url, 3 - $t,
       $h == 0 ? ';display:none' : '',
       $h - 1,

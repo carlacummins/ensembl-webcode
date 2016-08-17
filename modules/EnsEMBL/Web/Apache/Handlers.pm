@@ -1,6 +1,7 @@
 =head1 LICENSE
 
-Copyright [1999-2016] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -137,9 +138,10 @@ sub redirect_to_nearest_mirror {
   ## Redirects requests based on IP address - only used if the ENSEMBL_MIRRORS site parameter is configured
   my $r           = shift;
   my $server_name = $species_defs->ENSEMBL_SERVERNAME;
+  my $user_agent  = $r->headers_in->{'User-Agent'} ? $r->headers_in->{'User-Agent'} : "";
 
   # redirect only if we have mirrors, and the ENSEMBL_SERVERNAME is same as headers HOST (this is to prevent redirecting a static server request)
-  if (keys %{ $species_defs->ENSEMBL_MIRRORS || {} } && ( $r->headers_in->{'Host'} eq $server_name || $r->headers_in->{'X-Forwarded-Host'} eq $server_name )) {
+  if (keys %{ $species_defs->ENSEMBL_MIRRORS || {} } && ( $r->headers_in->{'Host'} eq $server_name || $r->headers_in->{'X-Forwarded-Host'} eq $server_name ) && $user_agent !~ /Googlebot/i) {
     my $unparsed_uri    = $r->unparsed_uri;
     my $redirect_flag   = $unparsed_uri =~ /redirect=([^\&\;]+)/ ? $1 : '';
     my $debug_ip        = $unparsed_uri =~ /debugip=([^\&\;]+)/ ?  $1 : '';
@@ -603,7 +605,7 @@ sub handler {
   # Give up
   $ENSEMBL_WEB_REGISTRY->timer_push('Handler "DECLINED"', undef, 'Apache');
   
-  return DECLINED;
+  return NOT_FOUND;
 }
 
 sub _check_species {

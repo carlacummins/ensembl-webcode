@@ -1,6 +1,7 @@
 =head1 LICENSE
 
-Copyright [1999-2016] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -77,6 +78,37 @@ The keys of the feature hashref refer to the strand on which we wish to draw the
 - this should be determined in the file parser, based on settings passed to it
 
 =cut
+}
+
+sub no_file {
+### Error message when a file is not available
+  my ($self, $error)  = @_;
+  $error ||= 'File unavailable';
+  $self->errorTrack($error);
+}
+
+sub get_strand_filters {
+### The strand settings in imageconfig are the reverse of filters,
+### so for clarity we need to convert them here
+  my ($self, $strand_code) = @_;
+  $strand_code ||= $self->{'my_config'}->get('strand');
+  my $strand_to_omit  = 0;
+  my $skip            = 0;
+
+  if ($strand_code eq 'f') { ## Forward
+    ## Don't filter data, but don't draw it on the reverse strand
+    $skip = '-1';
+  }
+  elsif ($strand_code eq 'r') { ## Reverse
+    ## Don't filter data, but don't draw it on the forward strand
+    $skip = '1';
+  }
+  elsif ($strand_code eq 'b') { ## Both
+    # Don't skip either strand - we want to split the data by strand 
+    $strand_to_omit = -$self->strand;
+  }
+
+  return ($skip, $strand_to_omit);
 }
 
 sub my_empty_label {

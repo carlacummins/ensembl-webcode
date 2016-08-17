@@ -1,6 +1,7 @@
 =head1 LICENSE
 
-Copyright [1999-2016] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -78,12 +79,11 @@ sub create_hash {
                   {'start' => $feature_2_start, 'end' => $feature_2_end},
                   ];
 
-  my $feature_strand = $metadata->{'default_strand'} || 1;
   my $href = $self->href({
                         'seq_region'  => $seqname,
                         'start'       => $click_start,
                         'end'         => $click_end,
-                        'strand'      => $feature_strand,
+                        'strand'      => 0,
                         });
 
   my $direction = $self->parser->get_direction;

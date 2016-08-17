@@ -1,6 +1,7 @@
 =head1 LICENSE
 
-Copyright [1999-2016] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -45,7 +46,7 @@ sub render_normal {
   my $logic_name     = $logic_names[0];
   ## Fetch all markers if this isn't a subset, e.g. SATMap
   $logic_name        = undef if $logic_name eq 'marker';
-  my $data           = [{'features' => $self->get_data($logic_name)}];
+  my $data           = $self->get_data($logic_name);
 
   my $config = $self->track_style_config;
   my $style  = EnsEMBL::Draw::Style::Feature->new($config, $data);
@@ -61,13 +62,15 @@ sub get_data {
   my ($self, $logic_name) = @_;
 
   my $hub = $self->{'config'}{'hub'}; 
-  return $hub->get_query('GlyphSet::Marker')->go($self,{
-    slice => $self->{'container'},
-    species => $self->{'config'}{'species'},
-    logic_name => $logic_name,
-    priority => $self->my_config('priority'),
-    marker_id => $self->my_config('marker_id')
-  });
+  my $features = $hub->get_query('GlyphSet::Marker')->go($self,{
+                                slice => $self->{'container'},
+                                species => $self->{'config'}{'species'},
+                                logic_name => $logic_name,
+                                priority => $self->my_config('priority'),
+                                marker_id => $self->my_config('marker_id')
+                  });
+  ## No need to de-strand since it's unstranded data
+  return [{'features' => $features}];
 }
 
 1;

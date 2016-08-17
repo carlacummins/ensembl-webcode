@@ -1,6 +1,7 @@
 =head1 LICENSE
 
-Copyright [1999-2016] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,6 +30,7 @@ use URI::Escape    qw(uri_escape uri_unescape);
 
 use EnsEMBL::Web::Command::UserData::CheckShare;
 use EnsEMBL::Web::Hub;
+use EnsEMBL::Web::Utils::Sanitize qw(clean_id);
 
 use base qw(EnsEMBL::Web::Controller);
 
@@ -208,7 +210,6 @@ sub get_shared_data {
   my $hub     = $self->hub;
   my $session = $hub->session;
   my $user    = $hub->user;
-  my $tree    = $image_config->tree;
   my @allowed;
   
   my @shared_data = split ',', $custom_data;
@@ -221,7 +222,7 @@ sub get_shared_data {
   my %shared = map { $_ => 1 } @shared_data;
   
   foreach (grep $shared{$_->{'user_record_id'} || $_->{'code'}}, map { $session->get_data(type => $_), $user ? $user->get_records($_ . 's') : () } qw(upload url)) {
-    push @allowed, uc $_->{'format'} eq 'TRACKHUB' ? $tree->clean_id($_->{'name'}) : split ', ', $_->{'analyses'} || "$_->{'type'}_$_->{'code'}";
+    push @allowed, uc $_->{'format'} eq 'TRACKHUB' ? clean_id($_->{'name'}) : split ', ', $_->{'analyses'} || "$_->{'type'}_$_->{'code'}";
   }
   
   return (

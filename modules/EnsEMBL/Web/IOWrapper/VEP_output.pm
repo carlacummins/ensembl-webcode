@@ -1,6 +1,7 @@
 =head1 LICENSE
 
-Copyright [1999-2016] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -52,13 +53,12 @@ sub create_hash {
   return if $end < 0 || $start > $slice->length;
 
   $metadata ||= {};
-  my $feature_strand = $metadata->{'default_strand'} || 1;
 
   my $href = $self->href({
                         'seq_region'  => $seqname,
                         'start'       => $feature_start,
                         'end'         => $feature_end,
-                        'strand'      => $feature_strand,
+                        'strand'      => 0,
                         });
 
   my $allele    = $self->parser->get_allele;
@@ -105,8 +105,7 @@ sub post_process {
   my $colours = $self->hub->species_defs->colour('variation');
 
   while (my($key, $subtrack) = each (%$data)) {
-    my $feature_strand = $subtrack->{'metadata'}{'default_strand'} || 1;
-    next unless scalar(@{$subtrack->{'features'}{$feature_strand}||[]});
+    next unless scalar(@{$subtrack->{'features'}||[]});
 
     ## VEP output doesn't have real metadata, so fake some
     $subtrack->{'metadata'} = {
@@ -121,7 +120,7 @@ sub post_process {
       sort {$a->{'start'} <=> $b->{'start'}
           || $a->{'end'} <=> $b->{'end'}
           || $a->{'allele'} cmp $b->{'allele'}
-        } @{$subtrack->{'features'}{$feature_strand}}
+        } @{$subtrack->{'features'}}
     ) {
       my $previous = $unique_features[-1];
       if ($previous && $previous->{'start'} == $f->{'start'} && $previous->{'end'} == $f->{'end'} 
@@ -147,7 +146,7 @@ sub post_process {
       $_->{'label'}         = $worst_consequence; 
     }
 
-    $data->{$key}{'features'}{$feature_strand} = \@unique_features;
+    $data->{$key}{'features'} = \@unique_features;
   }
 }
 

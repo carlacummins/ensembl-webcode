@@ -1,6 +1,7 @@
 =head1 LICENSE
 
-Copyright [1999-2016] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -87,6 +88,8 @@ use EnsEMBL::Web::Tools::OpenSearchDescription;
 use EnsEMBL::Web::Tools::Registry;
 use EnsEMBL::Web::Tools::MartRegistry;
 use EnsEMBL::Web::Utils::DynamicLoader qw(dynamic_require);
+
+our $CONFIG_QUIET = 0; # Set to 1 by scripts to remove natter
 
 use base qw(EnsEMBL::Web::Root);
 
@@ -347,7 +350,7 @@ sub parse {
   $self->{'_last_time'}  = $self->{'_start_time'};
   
   if (!$SiteDefs::ENSEMBL_CONFIG_BUILD && -e $self->{'_filename'}) {
-    warn " Retrieving conf from $self->{'_filename'}\n";
+    warn " Retrieving conf from $self->{'_filename'}\n" unless $CONFIG_QUIET;
     if($self->retrieve) {
       $reg_conf->configure;
       return 1;
@@ -473,11 +476,7 @@ sub _read_in_ini_file {
           if (defined $defaults->{$current_section}) {
             my %hash = %{$defaults->{$current_section}};
             
-            foreach my $k (keys %hash) {
-              next if exists $tree->{$current_section}{$k};
-              $tree->{$current_section}{$k} =
-                $defaults->{$current_section}{$k};
-            }
+            $tree->{$current_section}{$_} = $defaults->{$current_section}{$_} for keys %hash;
           }
         } elsif (/([\w*]\S*)\s*=\s*(.*)/ && defined $current_section) { # Config entry
           my ($key, $value) = ($1, $2); # Add a config entry under the current 'top level'
@@ -490,7 +489,6 @@ sub _read_in_ini_file {
           }
           
           $tree->{$current_section}{$key} = $value;
-
         } elsif (/([.\w]+)\s*=\s*(.*)/) { # precedes a [ ] section
           print STDERR "\t  [WARN] NO SECTION $filename.ini($line_number) -> $1 = $2;\n";
         }
@@ -669,23 +667,45 @@ sub _parse {
   # grab the contents of the ini file AND
   # IF  the DB packed files exist expand them
   # o/w attach the species databases
+
   # load the data and store the packed files
   foreach my $species (@$SiteDefs::ENSEMBL_DATASETS, 'MULTI') {
     $config_packer->species($species);
-    
     $self->process_ini_files($species, $config_packer, $defaults);
     $self->_merge_db_tree($tree, $db_tree, $species);
   }
   
   $self->_info_log('Parser', 'Post processing ini files');
-  
+
+  # Prepare to process strain information
+  my $name_lookup = {};
+  my $species_to_strains = {};
+
   # Loop over each tree and make further manipulations
   foreach my $species (@$SiteDefs::ENSEMBL_DATASETS, 'MULTI') {
     $config_packer->species($species);
     $config_packer->munge('config_tree');
     $self->_info_line('munging', "$species config");
+
+    ## Need to gather strain info for all species
+    $name_lookup->{$config_packer->tree->{$species}{'SPECIES_COMMON_NAME'}} = $species;
+    my $collection = $config_packer->tree->{$species}{'STRAIN_COLLECTION'};
+    if ($collection) {
+      if ($species_to_strains->{$collection}) {
+        push @{$species_to_strains->{$collection}}, $species;
+      }
+      else {
+        $species_to_strains->{$collection} = [$species];
+      }
+    }
   }
 
+  ## Compile strain info into a single structure
+  while (my($k, $v) = each (%$species_to_strains)) {
+    my $species = $name_lookup->{ucfirst($k)};
+    $tree->{$species}{'ALL_STRAINS'} = $v;
+  } 
+ 
   $CONF->{'_storage'} = $tree; # Store the tree
 }
 
@@ -711,6 +731,7 @@ sub process_ini_files {
     $config_packer->{$tree_type}->{$species} = lock_retrieve($file);
     $self->_info_line('Retrieve', $species eq 'MULTI' ? 'MULTI ini file' : $msg);
   } else {
+    $config_packer->munge('rest');
     $config_packer->munge('databases');
     $self->_info_line(sprintf('** %s **', uc $type), $msg);
     
@@ -1072,15 +1093,30 @@ sub species_label {
 }
 
 sub assembly_lookup {
+### Hash used to check if a given file or trackhub contains usable data
+### @param old_assemblies - flag to indicate that older assemblies should be included
+### @return lookup Hashref
+###   The keys of this hashref are of the following two types:
+###       - species_assembly    - used for attaching remote indexed files
+###       - UCSC identifier     - used for checking trackhubs
   my ($self, $old_assemblies) = @_;
   my $lookup = {};
   foreach ($self->valid_species) {
     my $assembly = $self->get_config($_, 'ASSEMBLY_VERSION');
-    ## A bit clunky, but it makes code cleaner in use
-    $lookup->{$assembly} = [$_, $assembly, 0];
-    ## Now look up UCSC assembly names
+
+    ## REMOTE INDEXED FILES
+    ## Unique keys, needed for attaching URL data to correct species
+    ## even when assembly name is not unique
+    $lookup->{$_.'_'.$assembly} = [$_, $assembly, 0];
+
+    ## TRACKHUBS
+    ## Add UCSC assembly name if available
     if ($self->get_config($_, 'UCSC_GOLDEN_PATH')) {
       $lookup->{$self->get_config($_, 'UCSC_GOLDEN_PATH')} = [$_, $assembly, 0];
+    }
+    else {
+      ## Otherwise assembly-only keys for species with no UCSC id configured
+      $lookup->{$assembly} = [$_, $assembly, 0];
     }
     if ($old_assemblies) {
       ## Include past UCSC assemblies
