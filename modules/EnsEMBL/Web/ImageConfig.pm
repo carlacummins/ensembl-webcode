@@ -61,7 +61,7 @@ sub new {
     species          => $species,
     altered          => [],
     user_track_count => 0,
-    load_threshold   => $hub->species_defs->ENSEMBL_LOAD_THRESHOLD || 2,
+    track_threshold  => $hub->species_defs->ENSEMBL_TRACK_THRESHOLD || 2,
     _tree            => EnsEMBL::Web::Tree->new,
     transcript_types => [qw(transcript alignslice_transcript tsv_transcript gsv_transcript TSE_transcript)],
     _parameters      => { # Default parameters
@@ -152,7 +152,7 @@ sub initialize {
   
   # Add user defined data sources
   $self->load_user_tracks;
-  my $threshold = $self->{'load_threshold'} || 0;
+  my $threshold = $self->{'track_threshold'} || 0;
   my $hidden_tracks = $self->{'user_track_count'} - $threshold;
   if ($hidden_tracks > 0) {
     $self->hub->session->add_data(
@@ -665,7 +665,7 @@ sub check_threshold {
   $display ||= 'off';
   return $display if $display eq 'off';
   ## Track is supposed to be on, so compare with threshold
-  if ($self->{'user_track_count'} >= $self->{'load_threshold'}) {
+  if ($self->{'user_track_count'} >= $self->{'track_threshold'}) {
     $display = 'off';
   }
   else {
