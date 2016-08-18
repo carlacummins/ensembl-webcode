@@ -988,11 +988,18 @@ sub _add_trackhub_tracks {
                                       'default' => 'coverage_with_reads',
                                       },
                         'bigbed'  => {
-                                      'full'    => 'as_transcript_label',
+                                      'full'    => 'as_transcript_nolabel',
                                       'pack'    => 'as_transcript_label',
                                       'squish'  => 'half_height',
                                       'dense'   => 'as_alignment_nolabel',
                                       'default' => 'as_transcript_label',
+                                      },
+                        'biggenepred' => {
+                                      'full'    => 'as_transcript_nolabel',
+                                      'pack'    => 'as_transcript_label',
+                                      'squish'  => 'half_height',
+                                      'dense'   => 'as_collapsed_label',
+                                      'default' => 'as_collapsed_label',
                                       },
                         'bigwig'  => {
                                       'full'    => 'signal',
@@ -1067,7 +1074,7 @@ sub _add_trackhub_tracks {
 
     if (exists $track->{'maxHeightPixels'}) {
       $source->{'maxHeightPixels'} = $track->{'maxHeightPixels'};
-    } elsif ($type eq 'BIGWIG' || $type eq 'BIGBED') {
+    } elsif ($type eq 'BIGWIG' || $type eq 'BIGBED' || $type eq 'BIGGENEPRED') {
       $source->{'maxHeightPixels'} = '64:32:16';
     }
     
@@ -1301,6 +1308,43 @@ sub _add_bigbed_track {
   );
 }
 
+sub _add_biggenepred_track {
+  my ($self, %args) = @_;
+
+  ## Get default settings for this format 
+  my ($strand, $renderers, $default) = $self->_user_track_settings($args{'source'}{'style'}, 'BIGGENEPRED');
+ 
+  my $options = {
+    external        => 'external',
+    sub_type        => 'url',
+    colourset       => 'feature',
+    colorByStrand   => $args{'source'}{'colorByStrand'},
+    spectrum        => $args{'source'}{'spectrum'},
+    strand          => $args{'source'}{'strand'} || $strand,
+    style           => $args{'source'}{'style'},
+    longLabel       => $args{'source'}{'longLabel'},
+    addhiddenbgd    => 1,
+    max_label_rows  => 2,
+    default_display => $args{'source'}{'default'} || $default,
+  };
+  ## Override default renderer (mainly used by trackhubs)
+  $options->{'display'} = $args{'source'}{'display'} if $args{'source'}{'display'};
+
+  if ($args{'view'} && $args{'view'} =~ /peaks/i) {
+    $options->{'join'} = 'off';  
+  } else {
+    push @$renderers, ('signal', 'Wiggle plot');
+  }
+  
+  $self->_add_file_format_track(
+    format      => 'BigGenePred',
+    description => 'BigGenePred file',
+    renderers   => $args{'source'}{'renderers'} || $renderers,
+    options     => $options,
+    %args,
+  );
+}
+
 sub _add_bigwig_track {
   my ($self, %args) = @_;
 
@@ -1435,8 +1479,7 @@ sub _add_file_format_track {
       $desc = $args{'description'};
     }
   }
-  my $thing = $args{'format'};
-  warn ">>> CHECKING $thing TRACK"; 
+
   $args{'options'}->{'display'} = $self->check_threshold($args{'options'}->{'display'});
   $self->generic_add($menu, undef, $args{'key'}, {}, {
     display     => 'off',
@@ -1471,6 +1514,11 @@ sub _user_track_settings {
   elsif (uc($format) =~ /BED|GFF|GTF/) {
     @user_renderers = @{$self->{'transcript_renderers'}};
     $default = 'as_transcript_label';
+  }
+  elsif (uc($format) eq 'BIGGENEPRED') {
+    @user_renderers = @{$self->{'transcript_renderers'}};
+    splice @user_renderers, 6, 0, 'as_collapsed_nolabel', 'Collapsed', 'as_collapsed_label', 'Collapsed with labels';
+    $default = 'as_collapsed_label';
   }
   else {
     @user_renderers = (@{$self->{'alignment_renderers'}}, 'difference', 'Differences');
@@ -2837,8 +2885,6 @@ sub add_regulation_builds {
   my $db  = $hub->database('funcgen', $self->species);
 
   return unless $db;
-
-  use Data::Dumper;
 
   $menu = $menu->append($self->create_submenu('regulatory_features', 'Regulatory features'));
 
