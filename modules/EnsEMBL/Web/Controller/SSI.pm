@@ -106,7 +106,7 @@ sub render_page {
   my $page    = $self->page;
   my $content = $self->content;
   
-  if ($content =~ /<!--#set var="decor" value="none"-->/ || $content =~ /^\s?<head>/) {
+  if ($content =~ s/<!--#set var="decor" value="none"-->// || $content =~ /^\s?<head>/) {
     $self->r->print($content);
     return $self->status = OK;
   }
